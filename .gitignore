@@ -1,0 +1,11 @@
+build/
+.cache/
+.claude/
+.env
+.env.*
+compile_commands.json
+.DS_Store
+*.o
+*.a
+docs/raw_files/
+docs/scrutiny/
