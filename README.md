@@ -39,19 +39,19 @@ confirmed  Product Demo               2026-03-11 02:00 PM  2026-03-11 03:00 PM  
 
 ### 1. Install
 
-**Build from source**:
-
 ```sh
-# install prerequisites
-# macOS:  brew install cmake curl
-# Ubuntu: sudo apt install cmake libcurl4-openssl-dev build-essential
+# Homebrew (macOS / Linux)
+brew tap 6missedcalls/calendly-cli
+brew install calendly
 
+# Or install via shell script
+curl -fsSL https://raw.githubusercontent.com/6missedcalls/calendly-cli/main/install.sh | sh
+
+# Or build from source
 git clone https://github.com/6missedcalls/calendly-cli.git
 cd calendly-cli
 make install    # builds + installs to /usr/local/bin
 ```
-
-All library dependencies (CLI11, nlohmann/json, toml++) are fetched automatically by CMake.
 
 ### 2. Authenticate
 
