@@ -9,3 +9,4 @@ compile_commands.json
 *.a
 docs/raw_files/
 docs/scrutiny/
+docs/QA_REPORT.md
