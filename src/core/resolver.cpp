@@ -146,7 +146,15 @@ std::string Resolver::resolve_event_type(const std::string& identifier) {
         }
     }
 
-    // 4b. Name substring match
+    // 4b. Slug match (case-insensitive exact) — checked before substring
+    for (const auto& et : types) {
+        if (to_lower(et.slug) == lower_id) {
+            print_verbose("Resolver: slug match -> " + et.name);
+            return et.uri;
+        }
+    }
+
+    // 4c. Name substring match
     std::vector<const EventType*> name_matches;
     for (const auto& et : types) {
         if (to_lower(et.name).find(lower_id) != std::string::npos) {
@@ -164,14 +172,6 @@ std::string Resolver::resolve_event_type(const std::string& identifier) {
             msg += "  - " + m->name + " (" + extract_uuid(m->uri) + ")\n";
         }
         throw CalendlyError(ErrorKind::Validation, msg);
-    }
-
-    // 5. Slug match (case-insensitive exact)
-    for (const auto& et : types) {
-        if (to_lower(et.slug) == lower_id) {
-            print_verbose("Resolver: slug match -> " + et.name);
-            return et.uri;
-        }
     }
 
     // Not found

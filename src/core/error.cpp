@@ -115,11 +115,14 @@ void check_http_status(long status_code, const std::string& response_body) {
         // through the RestClient layer. Here we provide a reasonable default.
         try {
             auto body = json::parse(response_body);
-            if (body.contains("retry_after") && !body["retry_after"].is_null()) {
-                retry_after = body["retry_after"].get<int>();
+            if (body.contains("retry_after") && body["retry_after"].is_number()) {
+                int server_val = body["retry_after"].get<int>();
+                if (server_val > 0 && server_val <= 300) {
+                    retry_after = server_val;
+                }
             }
-        } catch (const json::parse_error&) {
-            // Ignore parse errors; retry_after stays at default
+        } catch (...) {
+            // Ignore errors; retry_after stays at default
         }
         throw CalendlyError(ErrorKind::RateLimit, message, retry_after);
     }

@@ -1,6 +1,5 @@
 #include "modules/config/commands.h"
 #include "core/config.h"
-#include "core/color.h"
 #include "core/output.h"
 #include <iostream>
 
@@ -13,10 +12,10 @@ std::string mask_token(const std::optional<std::string>& token) {
         return "(not set)";
     }
     const auto& val = *token;
-    if (val.size() <= 4) {
-        return val + "...";
+    if (val.size() <= 8) {
+        return "****...";
     }
-    return val.substr(0, 4) + "...";
+    return val.substr(0, 4) + "****...";
 }
 
 void handle_show() {

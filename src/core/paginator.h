@@ -19,9 +19,10 @@ public:
     CursorPaginator(FetchFn fetch, PaginationOptions opts)
         : fetch_fn_(std::move(fetch)), opts_(opts) {}
 
-    // Fetch a single page
+    // Fetch a single page (uses configured page_token if none provided)
     CursorPage<T> fetch_page(const std::optional<std::string>& page_token = std::nullopt) {
-        return fetch_fn_(page_token);
+        auto token = page_token.has_value() ? page_token : opts_.page_token;
+        return fetch_fn_(token);
     }
 
     // Fetch ALL pages, concatenating collections
@@ -42,8 +43,8 @@ public:
                 }
             }
 
-            // If not fetch_all mode, stop after first page
-            if (!opts_.fetch_all && opts_.limit == 0) {
+            // If not fetch_all mode and no limit set, stop after first page
+            if (!opts_.fetch_all) {
                 break;
             }
 

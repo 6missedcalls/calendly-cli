@@ -174,29 +174,6 @@ std::string format_relative_time(const std::string& iso8601) {
     return oss.str();
 }
 
-std::string format_local_time(const std::string& iso8601, const std::string& tz_name) {
-    // Parse ISO 8601 and format as "YYYY-MM-DD HH:MM UTC".
-    // Full IANA timezone conversion requires platform-specific APIs (ICU/date.h),
-    // so we display in UTC with a suffix for clarity.
-    const auto parsed = parse_iso8601(iso8601);
-    if (!parsed.has_value()) {
-        return iso8601;
-    }
-
-    std::tm tm_val = {};
-    const auto ts = *parsed;
-    gmtime_r(&ts, &tm_val);
-
-    std::ostringstream oss;
-    oss << std::put_time(&tm_val, "%Y-%m-%d %H:%M");
-    if (tz_name.empty() || tz_name == "UTC") {
-        oss << " UTC";
-    } else {
-        oss << " UTC (" << tz_name << ")";
-    }
-    return oss.str();
-}
-
 int validate_count(int count) {
     return std::clamp(count, 1, 100);
 }

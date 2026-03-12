@@ -23,7 +23,8 @@ void handle_invitations(int count, bool all, const std::string& status) {
     try {
         auto org_uuid = resolve_org_uuid();
 
-        if (format == OutputFormat::Json) {
+        // JSON single page: pass through raw API response
+        if (format == OutputFormat::Json && !all) {
             std::map<std::string, std::string> params;
             params["count"] = std::to_string(validate_count(count));
             if (!status.empty()) {
@@ -53,6 +54,35 @@ void handle_invitations(int count, bool all, const std::string& status) {
             },
             page_opts
         );
+
+        // JSON --all: aggregate raw API pages to preserve all fields
+        if (format == OutputFormat::Json && all) {
+            json all_items = json::array();
+            std::map<std::string, std::string> params;
+            params["count"] = std::to_string(validate_count(count));
+            if (!status.empty()) params["status"] = status;
+
+            while (true) {
+                auto response = rest_get("organizations/" + org_uuid + "/invitations", params);
+                if (response.contains("collection") && response["collection"].is_array()) {
+                    for (auto& item : response["collection"]) {
+                        all_items.push_back(std::move(item));
+                    }
+                }
+                if (response.contains("pagination")
+                    && response["pagination"].contains("next_page_token")
+                    && !response["pagination"]["next_page_token"].is_null()) {
+                    params["page_token"] = response["pagination"]["next_page_token"].get<std::string>();
+                } else {
+                    break;
+                }
+            }
+            json result;
+            result["collection"] = all_items;
+            result["total"] = all_items.size();
+            output_json(result, std::cout);
+            return;
+        }
 
         auto invitations = all ? paginator.fetch_all()
                                : paginator.fetch_page().collection;

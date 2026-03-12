@@ -94,10 +94,13 @@ void handle_list(bool active_flag, bool inactive_flag, int count, bool all,
     try {
         auto user_uri = get_current_user_uri();
 
-        if (format == OutputFormat::Json) {
+        auto validated_count = validate_count(count);
+
+        // JSON single page: pass through raw API response
+        if (format == OutputFormat::Json && !all) {
             std::map<std::string, std::string> params;
             params["user"] = user_uri;
-            params["count"] = std::to_string(validate_count(count));
+            params["count"] = std::to_string(validated_count);
             if (active_flag) {
                 params["active"] = "true";
             } else if (inactive_flag) {
@@ -113,7 +116,7 @@ void handle_list(bool active_flag, bool inactive_flag, int count, bool all,
 
         event_types_api::ListOptions opts;
         opts.user_uri = user_uri;
-        opts.count = validate_count(count);
+        opts.count = validated_count;
         if (active_flag) {
             opts.active = true;
         } else if (inactive_flag) {
@@ -135,6 +138,38 @@ void handle_list(bool active_flag, bool inactive_flag, int count, bool all,
             },
             page_opts
         );
+
+        // JSON --all: aggregate raw API pages to preserve all fields
+        if (format == OutputFormat::Json && all) {
+            json all_items = json::array();
+            std::map<std::string, std::string> params;
+            params["user"] = user_uri;
+            params["count"] = std::to_string(validated_count);
+            if (active_flag) params["active"] = "true";
+            else if (inactive_flag) params["active"] = "false";
+            if (!sort.empty()) params["sort"] = validate_sort(sort);
+
+            while (true) {
+                auto response = rest_get("event_types", params);
+                if (response.contains("collection") && response["collection"].is_array()) {
+                    for (auto& item : response["collection"]) {
+                        all_items.push_back(std::move(item));
+                    }
+                }
+                if (response.contains("pagination")
+                    && response["pagination"].contains("next_page_token")
+                    && !response["pagination"]["next_page_token"].is_null()) {
+                    params["page_token"] = response["pagination"]["next_page_token"].get<std::string>();
+                } else {
+                    break;
+                }
+            }
+            json result;
+            result["collection"] = all_items;
+            result["total"] = all_items.size();
+            output_json(result, std::cout);
+            return;
+        }
 
         auto event_types = all ? paginator.fetch_all()
                                : paginator.fetch_page().collection;

@@ -1,6 +1,5 @@
 #pragma once
 #include <map>
-#include <optional>
 #include <string>
 
 // Extract UUID from full Calendly URI
@@ -19,8 +18,6 @@ std::string build_query_string(const std::map<std::string, std::string>& params)
 
 // Parse ISO 8601 timestamp for display
 std::string format_relative_time(const std::string& iso8601);
-std::string format_local_time(const std::string& iso8601, const std::string& timezone);
-
 // Validate count parameter (Resolution H-06): 1 <= count <= 100
 int validate_count(int count);
 

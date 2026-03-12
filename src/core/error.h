@@ -55,7 +55,8 @@ auto with_retry(Fn&& fn, int max_retries = 3) -> decltype(fn()) {
             if (e.kind() != ErrorKind::RateLimit || attempt == max_retries) {
                 throw;
             }
-            int wait_seconds = e.retry_after().value_or(1 << attempt);
+            int raw_wait = e.retry_after().value_or(1 << attempt);
+            int wait_seconds = std::min(raw_wait, 60);  // Cap at 60s
             std::this_thread::sleep_for(std::chrono::seconds(wait_seconds));
             print_verbose("retrying (" + std::to_string(attempt + 1) + "/"
                           + std::to_string(max_retries) + ") after "

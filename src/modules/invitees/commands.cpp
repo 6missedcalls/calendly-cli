@@ -20,7 +20,8 @@ void handle_list(const std::string& event_uuid, int count, bool all,
         // Normalize British "cancelled" → API's "canceled"
         std::string normalized_status = (status == "cancelled") ? "canceled" : status;
 
-        if (format == OutputFormat::Json) {
+        // JSON single page: pass through raw API response
+        if (format == OutputFormat::Json && !all) {
             std::map<std::string, std::string> params;
             params["count"] = std::to_string(validate_count(count));
             if (!normalized_status.empty()) {
@@ -56,6 +57,36 @@ void handle_list(const std::string& event_uuid, int count, bool all,
             },
             page_opts
         );
+
+        // JSON --all: aggregate raw API pages to preserve all fields
+        if (format == OutputFormat::Json && all) {
+            json all_items = json::array();
+            std::map<std::string, std::string> params;
+            params["count"] = std::to_string(validate_count(count));
+            if (!normalized_status.empty()) params["status"] = normalized_status;
+            if (!sort.empty()) params["sort"] = validate_sort(sort);
+
+            while (true) {
+                auto response = rest_get("scheduled_events/" + event_uuid + "/invitees", params);
+                if (response.contains("collection") && response["collection"].is_array()) {
+                    for (auto& item : response["collection"]) {
+                        all_items.push_back(std::move(item));
+                    }
+                }
+                if (response.contains("pagination")
+                    && response["pagination"].contains("next_page_token")
+                    && !response["pagination"]["next_page_token"].is_null()) {
+                    params["page_token"] = response["pagination"]["next_page_token"].get<std::string>();
+                } else {
+                    break;
+                }
+            }
+            json result;
+            result["collection"] = all_items;
+            result["total"] = all_items.size();
+            output_json(result, std::cout);
+            return;
+        }
 
         auto invitees = all ? paginator.fetch_all()
                             : paginator.fetch_page().collection;
@@ -151,35 +182,35 @@ void handle_show(const std::string& invitee_uuid) {
     }
 }
 
-void handle_book(const std::string& event_type_uuid, const std::string& email,
+void handle_book(const std::string& event_type_uri, const std::string& email,
                  const std::string& name, const std::string& timezone,
-                 const std::string& first_name, const std::string& last_name) {
+                 const std::string& start_time, const std::string& first_name,
+                 const std::string& last_name) {
     auto format = get_output_format();
 
     try {
+        // Build CreateEventRequest shape (Resolution B-03)
+        json invitee = json::object();
+        invitee["email"] = email;
+        if (!name.empty()) { invitee["name"] = name; }
+        if (!timezone.empty()) { invitee["timezone"] = timezone; }
+        if (!first_name.empty()) { invitee["first_name"] = first_name; }
+        if (!last_name.empty()) { invitee["last_name"] = last_name; }
+
         json request_body = json::object();
-        request_body["event_type_uuid"] = event_type_uuid;
-        request_body["email"] = email;
-        if (!name.empty()) {
-            request_body["name"] = name;
-        }
-        if (!timezone.empty()) {
-            request_body["timezone"] = timezone;
-        }
-        if (!first_name.empty()) {
-            request_body["first_name"] = first_name;
-        }
-        if (!last_name.empty()) {
-            request_body["last_name"] = last_name;
-        }
+        request_body["event_type"] = event_type_uri;
+        request_body["start_time"] = start_time;
+        request_body["invitee"] = invitee;
 
         if (format == OutputFormat::Json) {
-            auto response = rest_post("invitees", request_body);
+            auto response = rest_post("scheduled_events", request_body);
             output_json(response, std::cout);
             return;
         }
 
-        auto booking = invitees_api::book(request_body);
+        // POST to scheduled_events (same endpoint for all output formats)
+        auto response = rest_post("scheduled_events", request_body);
+        auto booking = response.get<BookingResponse>();
 
         if (format == OutputFormat::Csv) {
             output_csv_header({"uri", "email", "name", "status", "event", "cancel_url", "reschedule_url"});
@@ -284,8 +315,12 @@ void register_commands(CLI::App& app) {
     auto* book_cmd = inv_group->add_subcommand("book", "Book an invitee");
     book_cmd->group("");  // Hidden subcommand
 
-    auto* book_event_type_uuid = new std::string();
-    book_cmd->add_option("--event-type", *book_event_type_uuid, "Event type UUID")
+    auto* book_event_type_uri = new std::string();
+    book_cmd->add_option("--event-type", *book_event_type_uri, "Event type URI")
+        ->required();
+
+    auto* book_start_time = new std::string();
+    book_cmd->add_option("--start-time", *book_start_time, "Start time (ISO 8601)")
         ->required();
 
     auto* book_email = new std::string();
@@ -304,10 +339,11 @@ void register_commands(CLI::App& app) {
     auto* book_last_name = new std::string();
     book_cmd->add_option("--last-name", *book_last_name, "Invitee last name");
 
-    book_cmd->callback([book_event_type_uuid, book_email, book_name,
+    book_cmd->callback([book_event_type_uri, book_start_time, book_email, book_name,
                         book_timezone, book_first_name, book_last_name]() {
-        handle_book(*book_event_type_uuid, *book_email, *book_name,
-                    *book_timezone, *book_first_name, *book_last_name);
+        handle_book(*book_event_type_uri, *book_email, *book_name,
+                    *book_timezone, *book_start_time, *book_first_name,
+                    *book_last_name);
     });
 }
 

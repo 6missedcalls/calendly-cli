@@ -119,17 +119,32 @@ std::optional<User> Cache::get_user() {
         return std::nullopt;
     }
 
-    CacheEntry entry = file_data.get<CacheEntry>();
+    CacheEntry entry;
+    try {
+        entry = file_data.get<CacheEntry>();
+    } catch (...) {
+        print_verbose("Cache: user cache corrupt, ignoring");
+        return std::nullopt;
+    }
     if (!is_entry_fresh(entry)) {
         print_verbose("Cache: user cache expired");
         return std::nullopt;
     }
 
-    print_verbose("Cache: user cache hit");
-    return entry.data.get<User>();
+    try {
+        print_verbose("Cache: user cache hit");
+        return entry.data.get<User>();
+    } catch (...) {
+        print_verbose("Cache: user data corrupt, ignoring");
+        return std::nullopt;
+    }
 }
 
 void Cache::set_user(const User& user) {
+    if (is_cache_disabled()) {
+        print_verbose("Cache: write skipped (--no-cache)");
+        return;
+    }
     json user_json;
     user_json["uri"] = user.uri;
     user_json["name"] = user.name;
@@ -168,7 +183,13 @@ std::optional<std::vector<EventType>> Cache::get_event_types() {
         return std::nullopt;
     }
 
-    CacheEntry entry = file_data.get<CacheEntry>();
+    CacheEntry entry;
+    try {
+        entry = file_data.get<CacheEntry>();
+    } catch (...) {
+        print_verbose("Cache: event_types cache corrupt, ignoring");
+        return std::nullopt;
+    }
     if (!is_entry_fresh(entry)) {
         print_verbose("Cache: event_types cache expired");
         return std::nullopt;
@@ -178,12 +199,21 @@ std::optional<std::vector<EventType>> Cache::get_event_types() {
         return std::nullopt;
     }
 
-    print_verbose("Cache: event_types cache hit (" +
-                  std::to_string(entry.data.size()) + " types)");
-    return entry.data.get<std::vector<EventType>>();
+    try {
+        print_verbose("Cache: event_types cache hit (" +
+                      std::to_string(entry.data.size()) + " types)");
+        return entry.data.get<std::vector<EventType>>();
+    } catch (...) {
+        print_verbose("Cache: event_types data corrupt, ignoring");
+        return std::nullopt;
+    }
 }
 
 void Cache::set_event_types(const std::vector<EventType>& types) {
+    if (is_cache_disabled()) {
+        print_verbose("Cache: write skipped (--no-cache)");
+        return;
+    }
     json types_json = json::array();
     for (const auto& et : types) {
         json j;
@@ -273,8 +303,12 @@ bool Cache::is_fresh(const std::string& key) const {
     if (file_data.is_null() || !file_data.is_object()) {
         return false;
     }
-    CacheEntry entry = file_data.get<CacheEntry>();
-    return is_entry_fresh(entry);
+    try {
+        CacheEntry entry = file_data.get<CacheEntry>();
+        return is_entry_fresh(entry);
+    } catch (...) {
+        return false;
+    }
 }
 
 std::string Cache::cache_dir() const {
@@ -287,19 +321,23 @@ Cache::CacheStatus Cache::status() const {
 
     auto user_data = read_cache_file("user.json");
     if (!user_data.is_null() && user_data.is_object()) {
-        CacheEntry entry = user_data.get<CacheEntry>();
-        s.user_cached = is_entry_fresh(entry);
-        s.user_cached_at = entry.cached_at;
+        try {
+            CacheEntry entry = user_data.get<CacheEntry>();
+            s.user_cached = is_entry_fresh(entry);
+            s.user_cached_at = entry.cached_at;
+        } catch (...) {}
     }
 
     auto et_data = read_cache_file("event_types.json");
     if (!et_data.is_null() && et_data.is_object()) {
-        CacheEntry entry = et_data.get<CacheEntry>();
-        s.event_types_cached = is_entry_fresh(entry);
-        s.event_types_cached_at = entry.cached_at;
-        if (entry.data.is_array()) {
-            s.event_types_count = static_cast<int>(entry.data.size());
-        }
+        try {
+            CacheEntry entry = et_data.get<CacheEntry>();
+            s.event_types_cached = is_entry_fresh(entry);
+            s.event_types_cached_at = entry.cached_at;
+            if (entry.data.is_array()) {
+                s.event_types_count = static_cast<int>(entry.data.size());
+            }
+        } catch (...) {}
     }
 
     return s;

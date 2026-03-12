@@ -1,6 +1,5 @@
 #include "modules/users/commands.h"
 #include "modules/users/api.h"
-#include "core/color.h"
 #include "core/error.h"
 #include "core/filter.h"
 #include "core/output.h"

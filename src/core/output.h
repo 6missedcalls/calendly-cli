@@ -5,7 +5,7 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 
-enum class OutputFormat { Table, Detail, Json, Csv };
+enum class OutputFormat { Table, Json, Csv };
 
 [[nodiscard]] OutputFormat get_output_format() noexcept;
 void set_output_format(OutputFormat fmt) noexcept;

@@ -36,7 +36,8 @@ void handle_list(int count, bool all, const std::string& action,
     try {
         auto org_uri = get_current_user_org_uri();
 
-        if (format == OutputFormat::Json) {
+        // JSON single page: pass through raw API response
+        if (format == OutputFormat::Json && !all) {
             std::map<std::string, std::string> params;
             params["organization"] = org_uri;
             params["count"] = std::to_string(validate_count(count));
@@ -60,6 +61,41 @@ void handle_list(int count, bool all, const std::string& action,
             }
             auto response = rest_get("activity_log_entries", params);
             output_json(response, std::cout);
+            return;
+        }
+
+        // JSON --all: aggregate raw API pages to preserve all fields
+        if (format == OutputFormat::Json && all) {
+            json all_items = json::array();
+            std::map<std::string, std::string> params;
+            params["organization"] = org_uri;
+            params["count"] = std::to_string(validate_count(count));
+            if (!action.empty()) params["action"] = action;
+            if (!actor.empty()) params["actor"] = actor;
+            if (!namespace_filter.empty()) params["namespace"] = namespace_filter;
+            if (!min_occurred_at.empty()) params["min_occurred_at"] = min_occurred_at;
+            if (!max_occurred_at.empty()) params["max_occurred_at"] = max_occurred_at;
+            if (!sort.empty()) params["sort"] = validate_sort(sort);
+
+            while (true) {
+                auto response = rest_get("activity_log_entries", params);
+                if (response.contains("collection") && response["collection"].is_array()) {
+                    for (auto& item : response["collection"]) {
+                        all_items.push_back(std::move(item));
+                    }
+                }
+                if (response.contains("pagination")
+                    && response["pagination"].contains("next_page_token")
+                    && !response["pagination"]["next_page_token"].is_null()) {
+                    params["page_token"] = response["pagination"]["next_page_token"].get<std::string>();
+                } else {
+                    break;
+                }
+            }
+            json result;
+            result["collection"] = all_items;
+            result["total"] = all_items.size();
+            output_json(result, std::cout);
             return;
         }
 

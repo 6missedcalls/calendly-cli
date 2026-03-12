@@ -52,19 +52,10 @@ void set_enabled(bool enable) noexcept {
 std::string red(const std::string& s) { return wrap("31", s); }
 std::string green(const std::string& s) { return wrap("32", s); }
 std::string yellow(const std::string& s) { return wrap("33", s); }
-std::string blue(const std::string& s) { return wrap("34", s); }
-std::string magenta(const std::string& s) { return wrap("35", s); }
 std::string cyan(const std::string& s) { return wrap("36", s); }
 std::string gray(const std::string& s) { return wrap("90", s); }
 std::string bold(const std::string& s) { return wrap("1", s); }
 std::string dim(const std::string& s) { return wrap("2", s); }
-
-std::string reset() {
-    if (!enabled()) {
-        return "";
-    }
-    return "\033[0m";
-}
 
 std::string from_hex(const std::string& hex, const std::string& s) {
     if (!enabled()) {
